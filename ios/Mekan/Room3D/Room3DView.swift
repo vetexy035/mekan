@@ -64,20 +64,31 @@ struct Room3DView: View {
                         .frame(width: 210)
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        if let exportURL {
-                            ShareLink(item: exportURL) { Image(systemName: "square.and.arrow.up") }
-                        }
+                        Button { exportURL = export() } label: { Image(systemName: "square.and.arrow.up") }
                     }
                 }
-                .task { exportURL = export() }
+                .sheet(item: $exportURL) { url in ShareSheet(items: [url]) }
         }
     }
 
-    /// Writes the furnished scene as USDZ so it can be shared or opened in AR Quick Look.
+    /// Writes the furnished room as USDZ. Uses a freshly built scene, never the one
+    /// the SCNView is rendering, so the writer and the renderer don't share nodes.
     private func export() -> URL? {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(scan.name)-mobilyali.usdz")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mekan-mobilyali.usdz")
         try? FileManager.default.removeItem(at: url)
-        return scene.write(to: url, options: nil, delegate: nil, progressHandler: nil) ? url : nil
+        let copy = RoomSceneBuilder.scene(for: scan)
+        return copy.write(to: url, options: nil, delegate: nil, progressHandler: nil) ? url : nil
     }
+}
+
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
