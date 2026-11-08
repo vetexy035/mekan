@@ -6,6 +6,8 @@ import MekanCore
 struct FloorPlanView: View {
     let scan: RoomScan
     var showLabels = true
+    /// Wall stretches to highlight in green (e.g. where a new sofa fits).
+    var highlights: [FitSpot] = []
 
     var body: some View {
         Canvas { ctx, size in
@@ -57,6 +59,11 @@ struct FloorPlanView: View {
                 var mark = Path(); mark.move(to: a); mark.addLine(to: b)
                 let color: Color = o.kind == .window ? .cyan : .orange
                 ctx.stroke(mark, with: .color(color), style: StrokeStyle(lineWidth: 6, lineCap: .butt))
+            }
+
+            for spot in highlights {
+                var band = Path(); band.move(to: p(spot.start.x, spot.start.z)); band.addLine(to: p(spot.end.x, spot.end.z))
+                ctx.stroke(band, with: .color(.green.opacity(0.75)), style: StrokeStyle(lineWidth: 10, lineCap: .round))
             }
 
             guard showLabels else { return }

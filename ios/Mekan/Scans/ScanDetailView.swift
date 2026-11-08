@@ -75,6 +75,9 @@ struct ScanDetailView: View {
                 Button { showRedesign = true } label: {
                     Label("AI ile yeniden tasarla", systemImage: "wand.and.stars")
                 }
+                NavigationLink { FitCheckView(scan: scan) } label: {
+                    Label("Sığar mı? (yeni eşya kontrolü)", systemImage: "ruler")
+                }
                 NavigationLink { MaterialsView(scan: scan) } label: {
                     Label("Malzeme hesabı (boya, parke…)", systemImage: "paintbrush")
                 }
