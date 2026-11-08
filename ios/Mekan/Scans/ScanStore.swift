@@ -39,7 +39,12 @@ final class ScanStore: ObservableObject {
         let dir = folder(scan.id)
         try fm.createDirectory(at: dir.appendingPathComponent("renders"), withIntermediateDirectories: true)
         try RoomScan.encoder.encode(scan).write(to: dir.appendingPathComponent("scan.json"))
-        try room.export(to: modelURL(scan.id))
+        try room.export(to: modelURL(scan.id), exportOptions: .parametric)
+        // The raw scanned surface: furniture keeps its real shape instead of boxes.
+        try? room.export(to: meshURL(scan.id), exportOptions: .mesh)
+        // Keep RoomPlan's own data so the 3D file can be re-exported later
+        // (e.g. with custom furniture models) without rescanning.
+        try? JSONEncoder().encode(room).write(to: folder(scan.id).appendingPathComponent("captured-room.json"))
         if let jpg = photo?.jpegData(compressionQuality: 0.85) {
             try jpg.write(to: photoURL(scan.id))
         }
@@ -55,6 +60,8 @@ final class ScanStore: ObservableObject {
     func folder(_ id: UUID) -> URL { root.appendingPathComponent(id.uuidString, isDirectory: true) }
     func modelURL(_ id: UUID) -> URL { folder(id).appendingPathComponent("room.usdz") }
     func photoURL(_ id: UUID) -> URL { folder(id).appendingPathComponent("photo.jpg") }
+    func meshURL(_ id: UUID) -> URL { folder(id).appendingPathComponent("room-mesh.usdz") }
+    func hasMesh(_ id: UUID) -> Bool { fm.fileExists(atPath: meshURL(id).path) }
 
     func photo(_ id: UUID) -> UIImage? { UIImage(contentsOfFile: photoURL(id).path) }
 

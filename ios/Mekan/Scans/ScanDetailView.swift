@@ -9,6 +9,7 @@ struct ScanDetailView: View {
 
     @State private var modelURL: URL?
     @State private var showRedesign = false
+    @State private var showPlan = false
 
     private var m: RoomMeasurements { RoomMeasurements(scan: scan) }
 
@@ -16,7 +17,9 @@ struct ScanDetailView: View {
         List {
             Section {
                 FloorPlanView(scan: scan)
-                    .frame(height: 260)
+                    .frame(height: 300)
+                    .contentShape(Rectangle())
+                    .onTapGesture { showPlan = true }
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                 HStack(spacing: 16) {
                     legend(.orange, "Kapı"); legend(.cyan, "Pencere"); legend(.accentColor, "Eşya")
@@ -36,14 +39,19 @@ struct ScanDetailView: View {
             if !scan.objects.isEmpty {
                 Section("Eşyalar") {
                     ForEach(scan.objects) { o in
-                        row(o.category, String(format: "%.0f × %.0f × %.0f cm", o.size.x * 100, o.size.z * 100, o.size.y * 100))
+                        row(FurnitureNames.turkish(o.category), String(format: "%.0f × %.0f × %.0f cm", o.size.x * 100, o.size.z * 100, o.size.y * 100))
                     }
                 }
             }
 
             Section {
                 Button { modelURL = store.modelURL(scan.id) } label: {
-                    Label("3D modeli aç", systemImage: "cube")
+                    Label("3D model (sade, kutu eşyalar)", systemImage: "cube")
+                }
+                if store.hasMesh(scan.id) {
+                    Button { modelURL = store.meshURL(scan.id) } label: {
+                        Label("3D tarama (gerçek şekiller)", systemImage: "cube.transparent")
+                    }
                 }
                 Button { showRedesign = true } label: {
                     Label("AI ile yeniden tasarla", systemImage: "wand.and.stars")
@@ -70,6 +78,9 @@ struct ScanDetailView: View {
         .quickLookPreview($modelURL)
         .sheet(isPresented: $showRedesign) {
             RedesignView(scan: scan).environmentObject(store)
+        }
+        .fullScreenCover(isPresented: $showPlan) {
+            FloorPlanFullScreen(scan: scan)
         }
     }
 
