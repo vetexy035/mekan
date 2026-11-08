@@ -36,6 +36,35 @@ final class FurnitureBlueprintTests: XCTestCase {
         }
     }
 
+    func testSofaHasSeparateSeatCushionsAndLegs() {
+        let parts = FurnitureBlueprint.parts(category: "sofa", size: Point3(x: 2.2, y: 0.85, z: 0.95), backSign: 1)
+        XCTAssertEqual(parts.filter { $0.shape == .cylinder }.count, 4)
+        // Wide sofa -> 3 seat cushions and 3 back cushions, all soft-cornered.
+        let cushions = parts.filter { $0.material == .cushion }
+        XCTAssertEqual(cushions.count, 6)
+        XCTAssertTrue(cushions.allSatisfy { $0.rounding >= 0.3 })
+    }
+
+    func testNarrowSofaHasTwoSeatCushions() {
+        let parts = FurnitureBlueprint.parts(category: "sofa", size: Point3(x: 1.4, y: 0.85, z: 0.9), backSign: 1)
+        XCTAssertEqual(parts.filter { $0.material == .cushion }.count, 4)
+    }
+
+    func testBedHasLegsAndDuvet() {
+        let parts = FurnitureBlueprint.parts(category: "bed", size: Point3(x: 1.6, y: 0.9, z: 2.1), backSign: 1)
+        XCTAssertEqual(parts.filter { $0.shape == .cylinder }.count, 4)
+        XCTAssertEqual(parts.filter { $0.material == .fabric }.count, 1) // duvet
+    }
+
+    func testStorageDoorsHaveMetalHandlesOnTheFront() {
+        for back in [1.0, -1.0] {
+            let parts = FurnitureBlueprint.parts(category: "storage", size: Point3(x: 1.0, y: 1.8, z: 0.5), backSign: back)
+            let handles = parts.filter { $0.material == .metal }
+            XCTAssertEqual(handles.count, 2)
+            XCTAssertTrue(handles.allSatisfy { ($0.center.z > 0) == (back < 0) }) // front = opposite of back
+        }
+    }
+
     func testStairsHaveOneStepPerRiser() {
         let parts = FurnitureBlueprint.parts(category: "stairs", size: Point3(x: 1, y: 1.8, z: 3), backSign: 1)
         XCTAssertEqual(parts.count, 10) // 1.8 m / 0.18 m risers

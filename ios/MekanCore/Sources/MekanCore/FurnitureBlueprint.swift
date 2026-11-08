@@ -11,6 +11,8 @@ public struct FurniturePart: Equatable, Sendable {
     /// Box: width/height/depth. Cylinder: x = diameter, y = height (z ignored).
     public var size: Point3
     public var material: Material
+    /// Corner softness as a fraction of the smallest side (0 = sharp, 0.5 = pillow-round).
+    public var rounding: Double = 0.08
 
     /// Axis-aligned size of the part (cylinders are as wide as deep).
     public var extent: Point3 {
@@ -27,8 +29,9 @@ public enum FurnitureBlueprint {
         let bottom = -h / 2
 
         func box(_ cx: Double, _ cy: Double, _ cz: Double, _ sx: Double, _ sy: Double, _ sz: Double,
-                 _ m: FurniturePart.Material) -> FurniturePart {
-            FurniturePart(shape: .box, center: Point3(x: cx, y: cy, z: cz), size: Point3(x: sx, y: sy, z: sz), material: m)
+                 _ m: FurniturePart.Material, round: Double = 0.08) -> FurniturePart {
+            FurniturePart(shape: .box, center: Point3(x: cx, y: cy, z: cz), size: Point3(x: sx, y: sy, z: sz),
+                          material: m, rounding: round)
         }
         func leg(_ cx: Double, _ cz: Double, height: Double, diameter: Double, _ m: FurniturePart.Material) -> FurniturePart {
             FurniturePart(shape: .cylinder, center: Point3(x: cx, y: bottom + height / 2, z: cz),
@@ -58,40 +61,63 @@ public enum FurnitureBlueprint {
             ] + fourLegs(height: seatTop - seatT, inset: legD / 2 + 0.01, diameter: legD, .darkWood)
 
         case "sofa":
-            let baseH = h * 0.42, seatH = min(0.12, h * 0.15)
-            let backD = min(0.22, d * 0.28), arm = min(0.18, w * 0.12)
-            let armH = h * 0.68
+            let legH = min(0.08, h * 0.1)
+            let baseH = h * 0.32, seatH = min(0.14, h * 0.17)
+            let backD = min(0.24, d * 0.28), arm = min(0.18, w * 0.12)
+            let armH = h * 0.62 - legH
             let seatD = d - backD
-            return [
-                box(0, bottom + baseH / 2, 0, w, baseH, d, .fabric),
-                box(0, bottom + baseH + seatH / 2, zFlush(-b, seatD), w - 2 * arm, seatH, seatD, .cushion),
-                box(0, 0, zFlush(b, backD), w, h, backD, .fabric),
-                box(-(w / 2 - arm / 2), bottom + armH / 2, 0, arm, armH, d, .fabric),
-                box(w / 2 - arm / 2, bottom + armH / 2, 0, arm, armH, d, .fabric),
+            let seatTop = bottom + legH + baseH + seatH
+            let inner = w - 2 * arm
+            let n = inner > 1.6 ? 3 : 2
+            let cushionW = inner / Double(n) - 0.01
+            let backCushH = max(min(0.45, h - legH - baseH - seatH - 0.02), 0.05)
+            var parts = [
+                box(0, bottom + legH + baseH / 2, 0, w, baseH, d, .fabric, round: 0.15),
+                box(0, bottom + legH + (h - legH) / 2, zFlush(b, backD * 0.5), w, h - legH, backD * 0.5, .fabric, round: 0.25),
+                box(-(w / 2 - arm / 2), bottom + legH + armH / 2, 0, arm, armH, d, .fabric, round: 0.35),
+                box(w / 2 - arm / 2, bottom + legH + armH / 2, 0, arm, armH, d, .fabric, round: 0.35),
             ]
+            for i in 0..<n {
+                let cx = -inner / 2 + (Double(i) + 0.5) * inner / Double(n)
+                parts.append(box(cx, seatTop - seatH / 2, zFlush(-b, seatD), cushionW, seatH, seatD, .cushion, round: 0.35))
+                parts.append(box(cx, seatTop + backCushH / 2, b * (d / 2 - backD * 0.75), cushionW, backCushH,
+                                 backD * 0.5, .cushion, round: 0.45))
+            }
+            return parts + fourLegs(height: legH, inset: 0.06, diameter: min(0.04, w / 8, d / 8), .darkWood)
 
         case "bed":
-            let frameH = h * 0.35, mattressH = min(0.25, h * 0.3)
+            let legH = min(0.1, h * 0.15)
+            let frameH = h * 0.25, mattressH = min(0.25, h * 0.3)
             let headT = min(0.08, d * 0.05)
             let mattressD = d - headT - 0.04
-            let pillowW = w * 0.38, pillowD = min(0.35, d * 0.18), pillowH = min(0.1, h - frameH - mattressH)
+            let mattressTop = bottom + legH + frameH + mattressH
+            let duvetH = min(0.05, max(h - legH - frameH - mattressH, 0) / 2)
+            let duvetD = mattressD * 0.65
+            let pillowW = w * 0.38, pillowD = min(0.35, d * 0.18)
+            let pillowH = min(0.1, max(h - legH - frameH - mattressH, 0.01))
             let pillowZ = b * (d / 2 - headT - pillowD / 2 - 0.03)
             return [
-                box(0, bottom + frameH / 2, 0, w, frameH, d, .wood),
-                box(0, bottom + frameH + mattressH / 2, zFlush(-b, mattressD) , w - 0.04, mattressH, mattressD, .linen),
-                box(0, 0, zFlush(b, headT), w, h, headT, .darkWood),
-                box(-w / 4, bottom + frameH + mattressH + pillowH / 2, pillowZ, pillowW, pillowH, pillowD, .white),
-                box(w / 4, bottom + frameH + mattressH + pillowH / 2, pillowZ, pillowW, pillowH, pillowD, .white),
-            ]
+                box(0, bottom + legH + frameH / 2, 0, w, frameH, d, .wood),
+                box(0, mattressTop - mattressH / 2, zFlush(-b, mattressD), w - 0.04, mattressH, mattressD, .linen, round: 0.3),
+                box(0, mattressTop + duvetH / 2, zFlush(-b, duvetD), w - 0.02, duvetH, duvetD, .fabric, round: 0.4),
+                box(0, 0, zFlush(b, headT), w, h, headT, .darkWood, round: 0.2),
+                box(-w / 4, mattressTop + pillowH / 2, pillowZ, pillowW, pillowH, pillowD, .white, round: 0.5),
+                box(w / 4, mattressTop + pillowH / 2, pillowZ, pillowW, pillowH, pillowD, .white, round: 0.5),
+            ] + fourLegs(height: legH, inset: 0.06, diameter: min(0.05, w / 8, d / 8), .darkWood)
 
         case "storage":
-            let doorT = min(0.02, d * 0.05)
-            let bodyD = d - doorT
+            let doorT = min(0.02, d * 0.05), handleT = min(0.02, d * 0.05)
+            let bodyD = d - doorT - handleT
             let doorW = w / 2 - 0.01
+            let doorZ = -b * (d / 2 - handleT - doorT / 2)
+            let handleZ = -b * (d / 2 - handleT / 2)
+            let handleH = min(0.18, h * 0.15)
             return [
-                box(0, 0, zFlush(b, bodyD), w, h, bodyD, .wood),
-                box(-w / 4, 0, zFlush(-b, doorT), doorW, h - 0.02, doorT, .white),
-                box(w / 4, 0, zFlush(-b, doorT), doorW, h - 0.02, doorT, .white),
+                box(0, 0, zFlush(b, bodyD), w, h, bodyD, .wood, round: 0.02),
+                box(-w / 4, 0, doorZ, doorW, h - 0.02, doorT, .white, round: 0.05),
+                box(w / 4, 0, doorZ, doorW, h - 0.02, doorT, .white, round: 0.05),
+                box(-min(0.04, w / 8), 0, handleZ, min(0.015, w / 20), handleH, handleT, .metal, round: 0.3),
+                box(min(0.04, w / 8), 0, handleZ, min(0.015, w / 20), handleH, handleT, .metal, round: 0.3),
             ]
 
         case "refrigerator", "stove", "oven", "dishwasher", "washerDryer":
