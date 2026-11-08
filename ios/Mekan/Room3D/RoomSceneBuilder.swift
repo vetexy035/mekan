@@ -14,16 +14,20 @@ enum RoomSceneBuilder {
         root.addChildNode(floor(for: scan))
         for wall in scan.walls { root.addChildNode(wallNode(wall)) }
 
+        // RoomPlan heights start at the phone, not the floor; our floor is y = 0.
+        let floorY = scan.estimatedFloorY
+
         let wallsById = Dictionary(scan.walls.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for opening in scan.openings {
-            if let node = openingNode(opening, wall: opening.wallId.flatMap { wallsById[$0] } ?? nearestWall(to: opening, in: scan.walls)) {
+            let wall = opening.wallId.flatMap { wallsById[$0] } ?? nearestWall(to: opening, in: scan.walls)
+            if let node = openingNode(opening, wall: wall, floorY: floorY) {
                 root.addChildNode(node)
             }
         }
 
         let tables = scan.objects.filter { $0.category == "table" }
         for object in scan.objects {
-            root.addChildNode(furnitureNode(object, walls: scan.walls, tables: tables))
+            root.addChildNode(furnitureNode(object, walls: scan.walls, tables: tables, floorY: floorY))
         }
 
         addLights(to: root)
@@ -71,7 +75,7 @@ enum RoomSceneBuilder {
         atan2(-(w.end.z - w.start.z), w.end.x - w.start.x)
     }
 
-    private static func openingNode(_ o: Opening, wall: Wall?) -> SCNNode? {
+    private static func openingNode(_ o: Opening, wall: Wall?, floorY: Double) -> SCNNode? {
         guard o.kind != .opening else { return nil } // empty passages stay as they are
         let isWindow = o.kind == .window
         let box = SCNBox(width: CGFloat(o.width), height: CGFloat(o.height),
@@ -80,7 +84,7 @@ enum RoomSceneBuilder {
             ? material(UIColor(red: 0.62, green: 0.82, blue: 0.95, alpha: 0.55), roughness: 0.05, metalness: 0.1)
             : material(UIColor(red: 0.45, green: 0.30, blue: 0.20, alpha: 1), roughness: 0.6)]
         let node = SCNNode(geometry: box)
-        node.position = SCNVector3(o.center.x, o.center.y, o.center.z)
+        node.position = SCNVector3(o.center.x, FloorLevel.centerHeight(of: o, floorY: floorY), o.center.z)
         if let wall { node.eulerAngles.y = Float(wallAngle(wall)) }
         return node
     }
@@ -96,11 +100,11 @@ enum RoomSceneBuilder {
 
     // MARK: Furniture
 
-    private static func furnitureNode(_ o: RoomObject, walls: [Wall], tables: [RoomObject]) -> SCNNode {
+    private static func furnitureNode(_ o: RoomObject, walls: [Wall], tables: [RoomObject], floorY: Double) -> SCNNode {
         let back = FurnitureBlueprint.backSide(of: o, walls: walls, tables: tables)
         let group = SCNNode()
         group.name = FurnitureNames.turkish(o.category)
-        group.position = SCNVector3(o.center.x, o.center.y, o.center.z)
+        group.position = SCNVector3(o.center.x, FloorLevel.restingCenterHeight(of: o, floorY: floorY), o.center.z)
         group.eulerAngles.y = Float(o.yaw)
 
         for part in FurnitureBlueprint.parts(category: o.category, size: o.size, backSign: back) {

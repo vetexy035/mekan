@@ -71,9 +71,14 @@ public struct RoomScan: Codable, Equatable, Identifiable, Sendable {
     public var walls: [Wall]
     public var openings: [Opening]
     public var objects: [RoomObject]
+    /// Floor height in RoomPlan's world frame. RoomPlan measures from where the phone
+    /// started (~1.3 m up), so this is usually negative. Nil in scans saved before v0.2.
+    public var floorY: Double?
 
     public init(id: UUID = UUID(), name: String, capturedAt: Date = Date(),
-                walls: [Wall] = [], openings: [Opening] = [], objects: [RoomObject] = []) {
+                walls: [Wall] = [], openings: [Opening] = [], objects: [RoomObject] = [],
+                floorY: Double? = nil) {
+        self.floorY = floorY
         self.version = Self.currentVersion
         self.id = id
         self.name = name

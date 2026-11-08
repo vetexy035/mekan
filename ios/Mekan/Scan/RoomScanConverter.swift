@@ -29,7 +29,21 @@ enum RoomScanConverter {
                               yaw: yaw(of: t))
         }
 
-        return RoomScan(name: name, walls: walls, openings: openings, objects: objects)
+        return RoomScan(name: name, walls: walls, openings: openings, objects: objects,
+                        floorY: floorLevel(of: room))
+    }
+
+    /// Floor height in RoomPlan's frame (which starts at the phone, not the floor).
+    /// Prefers the detected floor surface, else the median bottom edge of the walls.
+    static func floorLevel(of room: CapturedRoom) -> Double? {
+        if let floor = room.floors.first {
+            return Double(floor.transform.columns.3.y)
+        }
+        let bottoms = room.walls
+            .map { Double($0.transform.columns.3.y - $0.dimensions.y / 2) }
+            .sorted()
+        guard !bottoms.isEmpty else { return nil }
+        return bottoms[bottoms.count / 2]
     }
 
     /// A wall surface is a plane: its local X axis runs along the wall and
