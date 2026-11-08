@@ -35,11 +35,17 @@ struct FloorPlanView: View {
             }
 
             // Walls
-            var walls = Path()
+            var walls = Path(), weakWalls = Path()
             for w in scan.walls {
-                walls.move(to: p(w.start.x, w.start.z)); walls.addLine(to: p(w.end.x, w.end.z))
+                // Low-confidence walls are drawn dashed orange: check these with a tape measure.
+                if w.confidence == .low {
+                    weakWalls.move(to: p(w.start.x, w.start.z)); weakWalls.addLine(to: p(w.end.x, w.end.z))
+                } else {
+                    walls.move(to: p(w.start.x, w.start.z)); walls.addLine(to: p(w.end.x, w.end.z))
+                }
             }
             ctx.stroke(walls, with: .color(.primary), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            ctx.stroke(weakWalls, with: .color(.orange), style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [8, 5]))
 
             // Doors and windows as colored marks on their wall
             let wallsById = Dictionary(scan.walls.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -68,7 +74,7 @@ struct FloorPlanView: View {
 
             // Furniture names, only when the footprint is big enough to hold them
             for o in scan.objects where min(o.size.x, o.size.z) * scale > 22 {
-                let label = Text(FurnitureNames.turkish(o.category))
+                let label = Text(o.turkishName)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Color.accentColor)
                 ctx.draw(label, at: p(o.center.x, o.center.z))

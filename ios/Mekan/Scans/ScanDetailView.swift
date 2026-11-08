@@ -11,10 +11,11 @@ struct ScanDetailView: View {
     @State private var showRedesign = false
     @State private var showPlan = false
     @State private var show3D = false
-    @State private var pdfURL: URL?
-    @State private var pdfError: String?
+    @State private var shareURL: URL?
+    @State private var exportError: String?
 
     private var m: RoomMeasurements { RoomMeasurements(scan: scan) }
+    private var quality: ScanQuality { ScanQuality(scan: scan) }
 
     var body: some View {
         List {
@@ -30,7 +31,19 @@ struct ScanDetailView: View {
                 .font(.caption)
             }
 
+            Section {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(qualityTitle).font(.subheadline.weight(.semibold))
+                        Text(quality.turkishSummary).font(.caption).foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: qualityIcon).foregroundStyle(qualityColor)
+                }
+            }
+
             Section("Ölçüler") {
+                if let type = RoomTypeNames.turkish(scan.roomType) { row("Oda tipi", type) }
                 row("Boy", meters(m.length))
                 row("En", meters(m.width))
                 row("Tavan yüksekliği", meters(m.ceilingHeight))
@@ -42,7 +55,7 @@ struct ScanDetailView: View {
             if !scan.objects.isEmpty {
                 Section("Eşyalar") {
                     ForEach(scan.objects) { o in
-                        row(FurnitureNames.turkish(o.category), String(format: "%.0f × %.0f × %.0f cm", o.size.x * 100, o.size.z * 100, o.size.y * 100))
+                        row(o.turkishName, String(format: "%.0f × %.0f × %.0f cm", o.size.x * 100, o.size.z * 100, o.size.y * 100))
                     }
                 }
             }
@@ -65,13 +78,26 @@ struct ScanDetailView: View {
                 NavigationLink { MaterialsView(scan: scan) } label: {
                     Label("Malzeme hesabı (boya, parke…)", systemImage: "paintbrush")
                 }
-                Button {
-                    do { pdfURL = try PlanPDF.make(scan: scan) } catch { pdfError = error.localizedDescription }
+                Menu {
+                    Button { export { try PlanPDF.make(scan: scan) } } label: {
+                        Label("PDF plan (ustaya gönder)", systemImage: "doc.richtext")
+                    }
+                    Button { export { try writeTemp(PlanSVG.make(scan: scan), ext: "svg") } } label: {
+                        Label("SVG plan (çizim programları)", systemImage: "square.on.circle")
+                    }
+                    Button { export { try writeTemp(String(decoding: RoomScan.encoder.encode(scan), as: UTF8.self), ext: "json") } } label: {
+                        Label("JSON ölçü verisi", systemImage: "curlybraces")
+                    }
+                    Button { shareURL = store.modelURL(scan.id) } label: {
+                        Label("USDZ 3D model", systemImage: "cube")
+                    }
+                    if store.hasMesh(scan.id) {
+                        Button { shareURL = store.meshURL(scan.id) } label: {
+                            Label("USDZ ham tarama", systemImage: "cube.transparent")
+                        }
+                    }
                 } label: {
-                    Label("PDF plan paylaş", systemImage: "doc.richtext")
-                }
-                ShareLink(item: store.modelURL(scan.id)) {
-                    Label("USDZ paylaş", systemImage: "square.and.arrow.up")
+                    Label("Dışa aktar / paylaş", systemImage: "square.and.arrow.up")
                 }
             }
 
@@ -99,10 +125,46 @@ struct ScanDetailView: View {
         .fullScreenCover(isPresented: $show3D) {
             Room3DView(scan: scan)
         }
-        .sheet(item: $pdfURL) { url in ShareSheet(items: [url]) }
-        .alert("PDF oluşturulamadı", isPresented: .constant(pdfError != nil)) {
-            Button("Tamam") { pdfError = nil }
-        } message: { Text(pdfError ?? "") }
+        .sheet(item: $shareURL) { url in ShareSheet(items: [url]) }
+        .alert("Dışa aktarılamadı", isPresented: .constant(exportError != nil)) {
+            Button("Tamam") { exportError = nil }
+        } message: { Text(exportError ?? "") }
+    }
+
+    private func export(_ make: () throws -> URL) {
+        do { shareURL = try make() } catch { exportError = error.localizedDescription }
+    }
+
+    private func writeTemp(_ text: String, ext: String) throws -> URL {
+        let safe = scan.name.components(separatedBy: CharacterSet(charactersIn: "/\\:?*\"<>|")).joined()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Mekan-\(safe).\(ext)")
+        try Data(text.utf8).write(to: url)
+        return url
+    }
+
+    private var qualityTitle: String {
+        switch quality.level {
+        case .high: "Tarama güveni: yüksek"
+        case .medium: "Tarama güveni: orta"
+        case .low: "Tarama güveni: düşük"
+        case nil: "Tarama güveni: bilinmiyor"
+        }
+    }
+    private var qualityIcon: String {
+        switch quality.level {
+        case .high: "checkmark.seal.fill"
+        case .medium: "exclamationmark.triangle.fill"
+        case .low: "xmark.octagon.fill"
+        case nil: "questionmark.circle"
+        }
+    }
+    private var qualityColor: Color {
+        switch quality.level {
+        case .high: .green
+        case .medium: .orange
+        case .low: .red
+        case nil: .secondary
+        }
     }
 
     private func meters(_ v: Double) -> String { String(format: "%.2f m", v) }

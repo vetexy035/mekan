@@ -23,7 +23,8 @@ public struct FurniturePart: Equatable, Sendable {
 /// Builds recognizable furniture from simple shapes, sized exactly to RoomPlan's
 /// detected bounding box. `backSign` (+1 / -1) says which local z side is the back.
 public enum FurnitureBlueprint {
-    public static func parts(category: String, size: Point3, backSign: Double) -> [FurniturePart] {
+    public static func parts(category: String, size: Point3, backSign: Double,
+                             attributes: [String] = []) -> [FurniturePart] {
         let b = backSign >= 0 ? 1.0 : -1.0
         let w = size.x, h = size.y, d = size.z
         let bottom = -h / 2
@@ -45,6 +46,17 @@ public enum FurnitureBlueprint {
         func zFlush(_ s: Double, _ thickness: Double) -> Double { s * (d / 2 - thickness / 2) }
 
         switch category {
+        case "table" where attributes.contains("TableShapeType.circular"):
+            let t = min(0.04, h * 0.1), dia = min(w, d)
+            let baseH = min(0.03, h * 0.05)
+            return [
+                FurniturePart(shape: .cylinder, center: Point3(x: 0, y: h / 2 - t / 2, z: 0),
+                              size: Point3(x: dia, y: t, z: dia), material: .wood),
+                leg(0, 0, height: h - t, diameter: min(0.12, dia / 4), .darkWood),
+                FurniturePart(shape: .cylinder, center: Point3(x: 0, y: bottom + baseH / 2, z: 0),
+                              size: Point3(x: dia * 0.5, y: baseH, z: dia * 0.5), material: .darkWood),
+            ]
+
         case "table":
             let t = min(0.04, h * 0.1)
             let legD = min(0.05, w / 4, d / 4)

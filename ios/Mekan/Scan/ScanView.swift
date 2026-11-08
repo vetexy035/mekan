@@ -1,5 +1,6 @@
 import SwiftUI
 import RoomPlan
+import MekanCore
 
 private struct RoomCaptureRepresentable: UIViewRepresentable {
     let scanner: RoomScanner
@@ -42,9 +43,17 @@ struct ScanView: View {
                 bottomBar.padding(.bottom, 32)
             }
         }
-        .onAppear { scanner.start() }
+        .overlay {
+            if scanner.state == .idle { tipsCard }
+        }
         .onChange(of: scanner.state) { _, new in
-            if new == .finished { askName = true }
+            guard new == .finished else { return }
+            // Suggest a name from the detected room type ("Salon", "Yatak odası"…).
+            if name.isEmpty, let room = scanner.result?.room,
+               let suggested = RoomTypeNames.turkish(RoomScanConverter.roomType(of: room)) {
+                name = suggested
+            }
+            askName = true
         }
         .alert("Odaya bir ad ver", isPresented: $askName) {
             TextField("Ör. Salon", text: $name)
@@ -53,6 +62,29 @@ struct ScanView: View {
         .alert("Kaydedilemedi", isPresented: .constant(saveError != nil)) {
             Button("Tamam") { saveError = nil }
         } message: { Text(saveError ?? "") }
+    }
+
+    /// Shown before the camera starts: the most common causes of bad scans.
+    private var tipsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("İyi bir tarama için").font(.title3.bold())
+            tip("lightbulb.fill", "Işıkları aç, perdeleri arala.")
+            tip("figure.stand", "Odanın ortasından başla, telefonu göğüs hizasında tut.")
+            tip("tortoise.fill", "Yavaşça dön; hızlı hareket en sık hata nedeni.")
+            tip("square.split.bottomrightquarter", "Köşeleri, tavan-duvar birleşimini ve kapıların tamamını göster.")
+            tip("camera.viewfinder", "Bitirmeden önce AI'ya göndermek istediğin açıya dön.")
+            Button { scanner.start() } label: {
+                Text("Taramaya başla").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(22)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .padding(24)
+    }
+
+    private func tip(_ icon: String, _ text: String) -> some View {
+        Label { Text(text).font(.subheadline) } icon: { Image(systemName: icon).foregroundStyle(.tint) }
     }
 
     @ViewBuilder private var bottomBar: some View {

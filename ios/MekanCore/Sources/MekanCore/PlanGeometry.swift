@@ -38,5 +38,26 @@ public enum FurnitureNames {
         "television": "Televizyon", "stairs": "Merdiven",
     ]
 
-    public static func turkish(_ category: String) -> String { names[category] ?? category }
+    /// RoomPlan iOS 17 attributes ("Type.value") that change the everyday name.
+    private static let refined: [String: String] = [
+        "sofa|SofaType.lShaped": "L koltuk", "sofa|SofaType.singleSeat": "Berjer",
+        "table|TableType.coffee": "Sehpa", "table|TableType.dining": "Yemek masası",
+        "chair|ChairType.dining": "Yemek sandalyesi", "chair|ChairType.stool": "Tabure",
+        "chair|ChairType.swivel": "Döner sandalye", "chair|ChairType.lounge": "Dinlenme koltuğu",
+        "storage|StorageType.shelf": "Raf", "storage|StorageType.cabinet": "Dolap",
+    ]
+
+    public static func turkish(_ category: String, attributes: [String] = []) -> String {
+        for a in attributes { if let n = refined["\(category)|\(a)"] { return n } }
+        return names[category] ?? category
+    }
+}
+
+/// Turkish names for RoomPlan room types (iOS 17 sections).
+public enum RoomTypeNames {
+    private static let names: [String: String] = [
+        "livingRoom": "Salon", "bedroom": "Yatak odası", "kitchen": "Mutfak",
+        "bathroom": "Banyo", "diningRoom": "Yemek odası",
+    ]
+    public static func turkish(_ type: String?) -> String? { type.flatMap { names[$0] } }
 }

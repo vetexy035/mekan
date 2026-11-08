@@ -16,13 +16,20 @@ public struct Point3: Codable, Equatable, Hashable, Sendable {
     public init(x: Double, y: Double, z: Double) { self.x = x; self.y = y; self.z = z }
 }
 
+/// RoomPlan's confidence in a detected surface or object.
+public enum Confidence: String, Codable, Sendable {
+    case low, medium, high
+}
+
 public struct Wall: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var start: Point2
     public var end: Point2
     public var height: Double
-    public init(id: String, start: Point2, end: Point2, height: Double) {
-        self.id = id; self.start = start; self.end = end; self.height = height
+    /// Nil in scans saved before confidence was recorded.
+    public var confidence: Confidence?
+    public init(id: String, start: Point2, end: Point2, height: Double, confidence: Confidence? = nil) {
+        self.id = id; self.start = start; self.end = end; self.height = height; self.confidence = confidence
     }
 
     public var length: Double { start.distance(to: end) }
@@ -54,9 +61,17 @@ public struct RoomObject: Codable, Equatable, Identifiable, Sendable {
     public var size: Point3
     /// Rotation around the vertical axis, radians.
     public var yaw: Double
-    public init(id: String, category: String, center: Point3, size: Point3, yaw: Double) {
+    /// RoomPlan (iOS 17) attributes as "Type.value", e.g. "SofaType.lShaped". Nil in older scans.
+    public var attributes: [String]?
+    public var confidence: Confidence?
+    public init(id: String, category: String, center: Point3, size: Point3, yaw: Double,
+                attributes: [String]? = nil, confidence: Confidence? = nil) {
         self.id = id; self.category = category; self.center = center; self.size = size; self.yaw = yaw
+        self.attributes = attributes; self.confidence = confidence
     }
+
+    /// Turkish display name, refined by attributes when known ("L koltuk", "Sehpa"…).
+    public var turkishName: String { FurnitureNames.turkish(category, attributes: attributes ?? []) }
 }
 
 /// Our own stable scan format (v1). RoomPlan's Codable output is version-dependent,
@@ -74,6 +89,8 @@ public struct RoomScan: Codable, Equatable, Identifiable, Sendable {
     /// Floor height in RoomPlan's world frame. RoomPlan measures from where the phone
     /// started (~1.3 m up), so this is usually negative. Nil in scans saved before v0.2.
     public var floorY: Double?
+    /// RoomPlan room type (iOS 17 sections), e.g. "livingRoom". Nil when unknown.
+    public var roomType: String?
 
     public init(id: UUID = UUID(), name: String, capturedAt: Date = Date(),
                 walls: [Wall] = [], openings: [Opening] = [], objects: [RoomObject] = [],

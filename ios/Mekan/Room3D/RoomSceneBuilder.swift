@@ -149,11 +149,12 @@ enum RoomSceneBuilder {
     private static func furnitureNode(_ o: RoomObject, walls: [Wall], tables: [RoomObject], floorY: Double) -> SCNNode {
         let back = FurnitureBlueprint.backSide(of: o, walls: walls, tables: tables)
         let group = SCNNode()
-        group.name = FurnitureNames.turkish(o.category)
+        group.name = o.turkishName
         group.position = SCNVector3(o.center.x, FloorLevel.restingCenterHeight(of: o, floorY: floorY), o.center.z)
         group.eulerAngles.y = Float(o.yaw)
 
-        for part in FurnitureBlueprint.parts(category: o.category, size: o.size, backSign: back) {
+        for part in FurnitureBlueprint.parts(category: o.category, size: o.size, backSign: back,
+                                             attributes: o.attributes ?? []) {
             let geometry: SCNGeometry
             switch part.shape {
             case .box:

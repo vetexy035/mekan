@@ -10,7 +10,8 @@ enum RoomScanConverter {
             let (start, end) = endpoints(of: surface)
             return Wall(id: surface.identifier.uuidString,
                         start: start, end: end,
-                        height: Double(surface.dimensions.y))
+                        height: Double(surface.dimensions.y),
+                        confidence: confidence(surface.confidence))
         }
 
         let openings =
@@ -26,11 +27,37 @@ enum RoomScanConverter {
                               size: Point3(x: Double(obj.dimensions.x),
                                            y: Double(obj.dimensions.y),
                                            z: Double(obj.dimensions.z)),
-                              yaw: yaw(of: t))
+                              yaw: yaw(of: t),
+                              attributes: attributeNames(obj),
+                              confidence: confidence(obj.confidence))
         }
 
-        return RoomScan(name: name, walls: walls, openings: openings, objects: objects,
-                        floorY: floorLevel(of: room))
+        var scan = RoomScan(name: name, walls: walls, openings: openings, objects: objects,
+                            floorY: floorLevel(of: room))
+        scan.roomType = roomType(of: room)
+        return scan
+    }
+
+    private static func confidence(_ c: CapturedRoom.Confidence) -> Confidence {
+        switch c {
+        case .high: .high
+        case .medium: .medium
+        case .low: .low
+        @unknown default: .medium
+        }
+    }
+
+    /// iOS 17 object attributes as "Type.value" (e.g. "SofaType.lShaped").
+    private static func attributeNames(_ obj: CapturedRoom.Object) -> [String]? {
+        let names = obj.attributes.map { "\(type(of: $0)).\($0)" }
+        return names.isEmpty ? nil : names
+    }
+
+    /// The most common detected section label (iOS 17), e.g. "livingRoom".
+    static func roomType(of room: CapturedRoom) -> String? {
+        let labels = room.sections.map { String(describing: $0.label) }.filter { $0 != "unidentified" }
+        let counts = Dictionary(labels.map { ($0, 1) }, uniquingKeysWith: +)
+        return counts.max { $0.value < $1.value }?.key
     }
 
     /// Floor height in RoomPlan's frame (which starts at the phone, not the floor).
