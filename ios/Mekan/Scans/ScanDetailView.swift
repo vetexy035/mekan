@@ -82,7 +82,7 @@ struct ScanDetailView: View {
                     Label("Malzeme hesabı (boya, parke…)", systemImage: "paintbrush")
                 }
                 Menu {
-                    Button { export { try PlanPDF.make(scan: scan) } } label: {
+                    Button { export { try PlanPDF.make(scan: scan, design: store.design(scan.id)) } } label: {
                         Label("PDF plan (ustaya gönder)", systemImage: "doc.richtext")
                     }
                     Button { export { try writeTemp(PlanSVG.make(scan: scan), ext: "svg") } } label: {
@@ -126,7 +126,7 @@ struct ScanDetailView: View {
             FloorPlanFullScreen(scan: scan)
         }
         .fullScreenCover(isPresented: $show3D) {
-            Room3DView(scan: scan)
+            Room3DView(scan: scan, design: store.design(scan.id)) { store.setDesign($0, for: scan.id) }
         }
         .sheet(item: $shareURL) { url in ShareSheet(items: [url]) }
         .alert("Dışa aktarılamadı", isPresented: .constant(exportError != nil)) {

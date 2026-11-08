@@ -20,6 +20,7 @@ enum MaterialSettingsStore {
 }
 
 struct MaterialsView: View {
+    @EnvironmentObject private var store: ScanStore
     let scan: RoomScan
     init(scan: RoomScan) { self.scan = scan }
 
@@ -43,7 +44,29 @@ struct MaterialsView: View {
 
     var body: some View {
         let e = estimate, c = cost
+        let design = store.design(scan.id)
         Form {
+            Section {
+                let rgb = design.wallColor.rgb
+                HStack {
+                    Circle().fill(Color(red: rgb.r, green: rgb.g, blue: rgb.b)).frame(width: 22, height: 22)
+                        .overlay(Circle().stroke(.black.opacity(0.15)))
+                    Text("Duvar: \(design.wallColor.name)")
+                    Spacer()
+                    Text("Zemin: \(design.floor.turkishName)").foregroundStyle(.secondary)
+                }
+                if abs(waste - design.floor.typicalWaste) > 0.001 {
+                    Button(String(format: "Fireyi %@ için ayarla (%%%.0f)", design.floor.turkishName, design.floor.typicalWaste * 100)) {
+                        waste = design.floor.typicalWaste
+                    }
+                    .font(.footnote)
+                }
+            } header: {
+                Text("Seçilen görünüm")
+            } footer: {
+                Text("3D oda ekranının altındaki paletten değiştirebilirsin.")
+            }
+
             Section {
                 item("Boya", detail: String(format: "%.1f m² duvar · %.1f L", e.netWallArea, e.paintLiters),
                      buy: MaterialText.cans(e.paintCans), price: $paintPrice, unit: "TL/L", cost: c.paint)

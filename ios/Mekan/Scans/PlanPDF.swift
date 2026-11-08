@@ -6,7 +6,7 @@ import MekanCore
 /// Meant to be sent to a tradesperson or family over WhatsApp/Mail.
 @MainActor
 enum PlanPDF {
-    static func make(scan: RoomScan) throws -> URL {
+    static func make(scan: RoomScan, design: ScanDesign = ScanDesign()) throws -> URL {
         let page = CGRect(x: 0, y: 0, width: 595, height: 842) // A4 in points
         let margin: CGFloat = 40
         let width = page.width - 2 * margin
@@ -67,6 +67,8 @@ enum PlanPDF {
             }
 
             draw("Malzeme listesi", at: &right, x: margin + colW + 20, width: colW, font: .boldSystemFont(ofSize: 13))
+            row("Duvar rengi", design.wallColor.name, at: &right, x: margin + colW + 20, width: colW)
+            row("Zemin", design.floor.turkishName, at: &right, x: margin + colW + 20, width: colW)
             let p = MaterialSettingsStore.prices
             let rows: [(String, String, Double, Double)] = [
                 ("Boya", MaterialText.cans(e.paintCans), p.paintPerLiter, cost.paint),

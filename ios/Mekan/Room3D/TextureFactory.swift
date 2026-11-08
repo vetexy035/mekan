@@ -3,7 +3,7 @@ import UIKit
 /// Procedurally painted textures (no downloaded assets, no licenses).
 /// Deterministic: the same kind + color always gives the same image, and results are cached.
 enum TextureFactory {
-    enum Kind: String { case wood, fabric, parquet, wall, stone }
+    enum Kind: String { case wood, fabric, parquet, wall, stone, tile, marble }
 
     private static var cache: [String: UIImage] = [:]
 
@@ -17,6 +17,8 @@ enum TextureFactory {
         case .parquet: img = parquet(color)
         case .wall: img = noise(color, amount: 0.035, size: 256)
         case .stone: img = noise(color, amount: 0.12, size: 256)
+        case .tile: img = tile(color)
+        case .marble: img = marble(color)
         }
         cache[key] = img
         return img
@@ -108,6 +110,52 @@ enum TextureFactory {
                     y += plankL
                 }
                 x += plankW
+            }
+        }
+    }
+
+    /// 1 m × 1 m: 60 × 60 cm porcelain tiles with grout lines.
+    private static func tile(_ base: UIColor) -> UIImage {
+        let size = CGSize(width: 1024, height: 1024)
+        let step = size.width * 0.6
+        var rng = SeededRandom(seed: 9)
+        let surface = noise(base, amount: 0.05, size: 256)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            let g = ctx.cgContext
+            surface.drawAsPattern(in: CGRect(origin: .zero, size: size))
+            var y: CGFloat = 0
+            while y < size.height {
+                var x: CGFloat = 0
+                while x < size.width {
+                    UIColor(white: rng.next() < 0.5 ? 0 : 1, alpha: 0.02 + rng.next() * 0.03).setFill()
+                    g.fill(CGRect(x: x, y: y, width: step, height: step))
+                    x += step
+                }
+                y += step
+            }
+            UIColor(white: 0.55, alpha: 1).setFill()
+            stride(from: 0, through: size.width, by: step).forEach { g.fill(CGRect(x: $0 - 2, y: 0, width: 4, height: size.height)) }
+            stride(from: 0, through: size.height, by: step).forEach { g.fill(CGRect(x: 0, y: $0 - 2, width: size.width, height: 4)) }
+        }
+    }
+
+    private static func marble(_ base: UIColor) -> UIImage {
+        let size = CGSize(width: 1024, height: 1024)
+        var rng = SeededRandom(seed: 13)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            base.setFill(); ctx.cgContext.fill(CGRect(origin: .zero, size: size))
+            // Soft grey veins wandering diagonally.
+            for _ in 0..<22 {
+                let path = UIBezierPath()
+                var p = CGPoint(x: rng.next() * size.width, y: 0)
+                path.move(to: p)
+                while p.y < size.height {
+                    p = CGPoint(x: p.x + (rng.next() - 0.35) * 60, y: p.y + 20 + rng.next() * 40)
+                    path.addLine(to: p)
+                }
+                UIColor(white: 0.35, alpha: 0.06 + rng.next() * 0.12).setStroke()
+                path.lineWidth = 0.8 + rng.next() * 3
+                path.stroke()
             }
         }
     }

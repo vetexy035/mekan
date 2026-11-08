@@ -8,14 +8,14 @@ import MekanCore
 enum RoomSceneBuilder {
     static let wallThickness: CGFloat = 0.08
 
-    static func scene(for scan: RoomScan) -> SCNScene {
+    static func scene(for scan: RoomScan, design: ScanDesign = ScanDesign()) -> SCNScene {
         let scene = SCNScene()
         let root = scene.rootNode
 
-        root.addChildNode(floor(for: scan))
+        root.addChildNode(floor(for: scan, type: design.floor))
         let center = PlanGeometry.centroid(of: scan.walls)
         for wall in scan.walls {
-            root.addChildNode(wallNode(wall))
+            root.addChildNode(wallNode(wall, color: design.wallColor))
             root.addChildNode(skirting(for: wall, roomCenter: center))
         }
 
@@ -43,7 +43,41 @@ enum RoomSceneBuilder {
 
     // MARK: Structure
 
-    private static func floor(for scan: RoomScan) -> SCNNode {
+    /// Applies a new wall color / floor to an already built scene (live preview).
+    static func apply(_ design: ScanDesign, to scene: SCNScene) {
+        scene.rootNode.enumerateChildNodes { node, _ in
+            if node.name == "wall", let box = node.geometry as? SCNBox {
+                box.materials = [wallMaterial(design.wallColor, size: max(box.width, box.height))]
+            } else if node.name == "floor", let shape = node.geometry {
+                let (lo, hi) = shape.boundingBox
+                shape.materials = [floorMaterial(design.floor, span: CGFloat(max(hi.x - lo.x, hi.y - lo.y)))]
+            }
+        }
+    }
+
+    static func wallMaterial(_ color: WallColor, size: CGFloat) -> SCNMaterial {
+        let c = color.rgb
+        return textured(.wall, UIColor(red: c.r, green: c.g, blue: c.b, alpha: 1), repeat: size / 2, roughness: 0.9)
+    }
+
+    static func floorMaterial(_ type: FloorType, span: CGFloat) -> SCNMaterial {
+        switch type {
+        case .oakParquet:
+            return textured(.parquet, UIColor(red: 0.74, green: 0.58, blue: 0.42, alpha: 1), repeat: span, roughness: 0.55)
+        case .walnutParquet:
+            return textured(.parquet, UIColor(red: 0.42, green: 0.29, blue: 0.20, alpha: 1), repeat: span, roughness: 0.5)
+        case .whiteOakParquet:
+            return textured(.parquet, UIColor(red: 0.86, green: 0.78, blue: 0.66, alpha: 1), repeat: span, roughness: 0.6)
+        case .greyTile:
+            return textured(.tile, UIColor(red: 0.70, green: 0.70, blue: 0.69, alpha: 1), repeat: span, roughness: 0.3)
+        case .marble:
+            return textured(.marble, UIColor(red: 0.94, green: 0.93, blue: 0.91, alpha: 1), repeat: span / 2, roughness: 0.12)
+        case .carpet:
+            return textured(.fabric, UIColor(red: 0.58, green: 0.55, blue: 0.50, alpha: 1), repeat: span * 3, roughness: 1)
+        }
+    }
+
+    private static func floor(for scan: RoomScan, type: FloorType) -> SCNNode {
         let points: [Point2]
         if let polygon = RoomMeasurements.floorPolygon(scan.walls) {
             points = polygon
@@ -60,9 +94,8 @@ enum RoomSceneBuilder {
         path.close()
         let shape = SCNShape(path: path, extrusionDepth: 0.02)
         let span = max(path.bounds.width, path.bounds.height)
-        // Texture is 1 m of planks; repeat it once per meter.
-        shape.materials = [textured(.parquet, UIColor(red: 0.74, green: 0.58, blue: 0.42, alpha: 1),
-                                    repeat: span, roughness: 0.55)]
+        // Floor textures cover 1 m; repeat once per meter.
+        shape.materials = [floorMaterial(type, span: span)]
         let node = SCNNode(geometry: shape)
         node.eulerAngles.x = -.pi / 2
         node.position.y = -0.01
@@ -70,10 +103,9 @@ enum RoomSceneBuilder {
         return node
     }
 
-    private static func wallNode(_ wall: Wall) -> SCNNode {
+    private static func wallNode(_ wall: Wall, color: WallColor) -> SCNNode {
         let box = SCNBox(width: CGFloat(wall.length), height: CGFloat(wall.height), length: wallThickness, chamferRadius: 0)
-        box.materials = [textured(.wall, UIColor(red: 0.95, green: 0.94, blue: 0.91, alpha: 1),
-                                  repeat: CGFloat(max(wall.length, wall.height)) / 2, roughness: 0.9)]
+        box.materials = [wallMaterial(color, size: CGFloat(max(wall.length, wall.height)))]
         let node = SCNNode(geometry: box)
         node.position = SCNVector3((wall.start.x + wall.end.x) / 2, wall.height / 2, (wall.start.z + wall.end.z) / 2)
         node.eulerAngles.y = Float(wallAngle(wall))

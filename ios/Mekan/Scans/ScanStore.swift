@@ -65,6 +65,21 @@ final class ScanStore: ObservableObject {
 
     func photo(_ id: UUID) -> UIImage? { UIImage(contentsOfFile: photoURL(id).path) }
 
+    // MARK: Design (wall color, floor)
+
+    func design(_ id: UUID) -> ScanDesign {
+        let url = folder(id).appendingPathComponent("design.json")
+        guard let data = try? Data(contentsOf: url),
+              let d = try? JSONDecoder().decode(ScanDesign.self, from: data) else { return ScanDesign() }
+        return d
+    }
+
+    func setDesign(_ design: ScanDesign, for id: UUID) {
+        let url = folder(id).appendingPathComponent("design.json")
+        try? JSONEncoder().encode(design).write(to: url)
+        objectWillChange.send()
+    }
+
     // MARK: Renders
 
     func renders(_ id: UUID) -> [URL] {
