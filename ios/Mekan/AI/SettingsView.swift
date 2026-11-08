@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var apiKey = KeychainStore.get(AISettings.openAIKeyAccount) ?? ""
-    @AppStorage(AISettings.modelDefaultsKey) private var model = AISettings.defaultModel
+    @State private var model = AISettings.model
 
     var body: some View {
         NavigationStack {
@@ -27,6 +27,8 @@ struct SettingsView: View {
                     Button("Kaydet") {
                         KeychainStore.set(apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
                                           for: AISettings.openAIKeyAccount)
+                        UserDefaults.standard.set(model.trimmingCharacters(in: .whitespaces),
+                                                  forKey: AISettings.modelDefaultsKey)
                         dismiss()
                     }
                 }

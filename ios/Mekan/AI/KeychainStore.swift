@@ -37,11 +37,18 @@ enum KeychainStore {
 enum AISettings {
     static let openAIKeyAccount = "openai"
     static let modelDefaultsKey = "openai.model"
-    static let defaultModel = "gpt-image-1"
+    /// OpenAI's recommended model when edit precision matters (gpt-image-1 shut down 2026-10-23).
+    static let defaultModel = "gpt-image-2.5-sunburst"
+    /// Models OpenAI has shut down or is shutting down; saved values are migrated.
+    static let retiredModels: Set<String> = ["gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini", "dall-e-2", "dall-e-3"]
 
     static var model: String {
-        let m = UserDefaults.standard.string(forKey: modelDefaultsKey) ?? ""
-        return m.isEmpty ? defaultModel : m
+        let m = (UserDefaults.standard.string(forKey: modelDefaultsKey) ?? "").trimmingCharacters(in: .whitespaces)
+        if m.isEmpty || retiredModels.contains(m) {
+            UserDefaults.standard.set(defaultModel, forKey: modelDefaultsKey)
+            return defaultModel
+        }
+        return m
     }
 
     static func provider() -> ImageProvider {
