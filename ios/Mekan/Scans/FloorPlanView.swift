@@ -1,6 +1,33 @@
 import SwiftUI
 import MekanCore
 
+/// Maps room coordinates (meters, XZ) to plan view points and back.
+/// Fit to the walls only, so dragging furniture never rescales the plan.
+struct PlanTransform {
+    let minX: Double, minZ: Double, scale: Double, offX: Double, offZ: Double
+
+    init?(scan: RoomScan, size: CGSize, pad: CGFloat) {
+        let pts = scan.walls.flatMap { [$0.start, $0.end] }
+        guard let minX = pts.map(\.x).min(), let maxX = pts.map(\.x).max(),
+              let minZ = pts.map(\.z).min(), let maxZ = pts.map(\.z).max(), size.width > 2 * pad else { return nil }
+        let spanX = max(maxX - minX, 0.01), spanZ = max(maxZ - minZ, 0.01)
+        let scale = min((size.width - 2 * pad) / spanX, (size.height - 2 * pad) / spanZ)
+        self.minX = minX; self.minZ = minZ; self.scale = scale
+        offX = (size.width - spanX * scale) / 2
+        offZ = (size.height - spanZ * scale) / 2
+    }
+
+    func screen(_ x: Double, _ z: Double) -> CGPoint {
+        CGPoint(x: offX + (x - minX) * scale, y: offZ + (z - minZ) * scale)
+    }
+
+    func world(_ p: CGPoint) -> Point2 {
+        Point2(x: (p.x - offX) / scale + minX, z: (p.y - offZ) / scale + minZ)
+    }
+
+    static func pad(showLabels: Bool) -> CGFloat { showLabels ? 44 : 16 }
+}
+
 /// Top-down 2D plan drawn from the scan: walls with their lengths, doors/windows
 /// and labeled furniture footprints.
 struct FloorPlanView: View {
@@ -8,21 +35,16 @@ struct FloorPlanView: View {
     var showLabels = true
     /// Wall stretches to highlight in green (e.g. where a new sofa fits).
     var highlights: [FitSpot] = []
+    /// Editor selection, drawn emphasized.
+    var selectedObjectId: String?
+    var selectedWallId: String?
 
     var body: some View {
         Canvas { ctx, size in
-            let pts = scan.walls.flatMap { [$0.start, $0.end] }
-            guard let minX = pts.map(\.x).min(), let maxX = pts.map(\.x).max(),
-                  let minZ = pts.map(\.z).min(), let maxZ = pts.map(\.z).max() else { return }
-
             // Extra margin so wall-length labels outside the walls stay visible.
-            let pad: CGFloat = showLabels ? 44 : 16
-            let spanX = max(maxX - minX, 0.01), spanZ = max(maxZ - minZ, 0.01)
-            let scale = min((size.width - 2 * pad) / spanX, (size.height - 2 * pad) / spanZ)
-            let offX = (size.width - spanX * scale) / 2, offZ = (size.height - spanZ * scale) / 2
-            func p(_ x: Double, _ z: Double) -> CGPoint {
-                CGPoint(x: offX + (x - minX) * scale, y: offZ + (z - minZ) * scale)
-            }
+            guard let t = PlanTransform(scan: scan, size: size, pad: PlanTransform.pad(showLabels: showLabels)) else { return }
+            let scale = t.scale
+            func p(_ x: Double, _ z: Double) -> CGPoint { t.screen(x, z) }
 
             // Furniture footprints
             for o in scan.objects {
@@ -32,8 +54,9 @@ struct FloorPlanView: View {
                     p(o.center.x + dx * c + dz * s, o.center.z - dx * s + dz * c)
                 }
                 var path = Path(); path.addLines(corners); path.closeSubpath()
-                ctx.fill(path, with: .color(.accentColor.opacity(0.18)))
-                ctx.stroke(path, with: .color(.accentColor.opacity(0.6)), lineWidth: 1)
+                let selected = o.id == selectedObjectId
+                ctx.fill(path, with: .color(.accentColor.opacity(selected ? 0.4 : 0.18)))
+                ctx.stroke(path, with: .color(.accentColor.opacity(selected ? 1 : 0.6)), lineWidth: selected ? 3 : 1)
             }
 
             // Walls
@@ -59,6 +82,11 @@ struct FloorPlanView: View {
                 var mark = Path(); mark.move(to: a); mark.addLine(to: b)
                 let color: Color = o.kind == .window ? .cyan : .orange
                 ctx.stroke(mark, with: .color(color), style: StrokeStyle(lineWidth: 6, lineCap: .butt))
+            }
+
+            if let id = selectedWallId, let w = wallsById[id] {
+                var sel = Path(); sel.move(to: p(w.start.x, w.start.z)); sel.addLine(to: p(w.end.x, w.end.z))
+                ctx.stroke(sel, with: .color(.accentColor), style: StrokeStyle(lineWidth: 8, lineCap: .round))
             }
 
             for spot in highlights {

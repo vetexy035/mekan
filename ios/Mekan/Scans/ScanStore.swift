@@ -52,6 +52,28 @@ final class ScanStore: ObservableObject {
         return scan.id
     }
 
+    /// Saves a hand-corrected scan. The first edit keeps the untouched scan as
+    /// scan.original.json so the user can always go back.
+    func update(_ scan: RoomScan) throws {
+        let dir = folder(scan.id)
+        let current = dir.appendingPathComponent("scan.json")
+        let original = dir.appendingPathComponent("scan.original.json")
+        if !fm.fileExists(atPath: original.path), fm.fileExists(atPath: current.path) {
+            try fm.copyItem(at: current, to: original)
+        }
+        try RoomScan.encoder.encode(scan).write(to: current)
+        reload()
+    }
+
+    func hasOriginal(_ id: UUID) -> Bool {
+        fm.fileExists(atPath: folder(id).appendingPathComponent("scan.original.json").path)
+    }
+
+    func original(_ id: UUID) -> RoomScan? {
+        guard let data = try? Data(contentsOf: folder(id).appendingPathComponent("scan.original.json")) else { return nil }
+        return try? RoomScan.decoder.decode(RoomScan.self, from: data)
+    }
+
     func delete(_ id: UUID) {
         try? fm.removeItem(at: folder(id))
         reload()

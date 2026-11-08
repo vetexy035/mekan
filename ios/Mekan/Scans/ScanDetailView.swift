@@ -11,6 +11,7 @@ struct ScanDetailView: View {
     @State private var showRedesign = false
     @State private var showPlan = false
     @State private var show3D = false
+    @State private var showEditor = false
     @State private var shareURL: URL?
     @State private var exportError: String?
 
@@ -29,6 +30,9 @@ struct ScanDetailView: View {
                     legend(.orange, "Kapı"); legend(.cyan, "Pencere"); legend(.accentColor, "Eşya")
                 }
                 .font(.caption)
+                Button { showEditor = true } label: {
+                    Label("Planı düzenle (ölçü düzelt, eşya taşı)", systemImage: "pencil.and.ruler")
+                }
             }
 
             Section {
@@ -127,6 +131,9 @@ struct ScanDetailView: View {
         }
         .fullScreenCover(isPresented: $show3D) {
             Room3DView(scan: scan, design: store.design(scan.id)) { store.setDesign($0, for: scan.id) }
+        }
+        .fullScreenCover(isPresented: $showEditor) {
+            PlanEditorView(scan: scan).environmentObject(store)
         }
         .sheet(item: $shareURL) { url in ShareSheet(items: [url]) }
         .alert("Dışa aktarılamadı", isPresented: .constant(exportError != nil)) {
