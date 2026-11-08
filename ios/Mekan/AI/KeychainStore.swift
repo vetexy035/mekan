@@ -1,7 +1,8 @@
 import Foundation
 import Security
+import MekanCore
 
-/// Minimal Keychain wrapper for the API key (stays on device, not in UserDefaults).
+/// Minimal Keychain wrapper for API keys (stay on device, not in UserDefaults).
 enum KeychainStore {
     private static let service = "app.mekan.apikeys"
 
@@ -34,24 +35,41 @@ enum KeychainStore {
     }
 }
 
+/// Which service generates designs, plus per-service key and model.
 enum AISettings {
-    static let openAIKeyAccount = "openai"
-    static let modelDefaultsKey = "openai.model"
-    /// OpenAI's recommended model when edit precision matters (gpt-image-1 shut down 2026-10-23).
-    static let defaultModel = "gpt-image-2.5-sunburst"
-    /// Models OpenAI has shut down or is shutting down; saved values are migrated.
+    private static let providerKey = "ai.provider"
+    /// Models the services have shut down or are shutting down; saved values are migrated.
     static let retiredModels: Set<String> = ["gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini", "dall-e-2", "dall-e-3"]
 
-    static var model: String {
-        let m = (UserDefaults.standard.string(forKey: modelDefaultsKey) ?? "").trimmingCharacters(in: .whitespaces)
+    static var selected: AIProviderKind {
+        get { UserDefaults.standard.string(forKey: providerKey).flatMap(AIProviderKind.init) ?? .pollinations }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: providerKey) }
+    }
+
+    /// Keychain account; "openai" keeps keys saved by earlier versions.
+    static func keyAccount(_ p: AIProviderKind) -> String { p.rawValue }
+    /// "openai.model" is the key earlier versions used.
+    private static func modelKey(_ p: AIProviderKind) -> String { "\(p.rawValue).model" }
+
+    static func apiKey(_ p: AIProviderKind) -> String { KeychainStore.get(keyAccount(p)) ?? "" }
+    static func setAPIKey(_ key: String, for p: AIProviderKind) {
+        KeychainStore.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: keyAccount(p))
+    }
+
+    static func model(_ p: AIProviderKind) -> String {
+        let m = (UserDefaults.standard.string(forKey: modelKey(p)) ?? "").trimmingCharacters(in: .whitespaces)
         if m.isEmpty || retiredModels.contains(m) {
-            UserDefaults.standard.set(defaultModel, forKey: modelDefaultsKey)
-            return defaultModel
+            UserDefaults.standard.set(p.defaultModel, forKey: modelKey(p))
+            return p.defaultModel
         }
         return m
     }
+    static func setModel(_ model: String, for p: AIProviderKind) {
+        UserDefaults.standard.set(model.trimmingCharacters(in: .whitespaces), forKey: modelKey(p))
+    }
 
     static func provider() -> ImageProvider {
-        OpenAIImageProvider(apiKey: KeychainStore.get(openAIKeyAccount) ?? "", model: model)
+        let p = selected
+        return OpenAIImageProvider(apiKey: apiKey(p), model: model(p), base: p.baseURL, providerName: p.displayName)
     }
 }

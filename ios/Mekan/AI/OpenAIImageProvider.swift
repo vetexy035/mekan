@@ -1,16 +1,17 @@
 import Foundation
 
-/// OpenAI Images API. With a photo it uses /images/edits so the result keeps the
-/// room's viewpoint and geometry; without one it falls back to /images/generations.
+/// Any service speaking the OpenAI Images API (OpenAI itself, Pollinations…).
+/// With a photo it uses /images/edits so the result keeps the room's viewpoint and
+/// geometry; without one it falls back to /images/generations.
 struct OpenAIImageProvider: ImageProvider {
     var apiKey: String
     var model: String
-    var size = "1024x1536" // portrait, matches the phone photo
-
-    private let base = URL(string: "https://api.openai.com/v1/images/")!
+    var base: URL
+    var providerName: String
+    var size = "1024x1536" // portrait, matches the phone photo; multiples of 16 for MAI models
 
     func redesign(_ request: RedesignRequest) async throws -> Data {
-        guard !apiKey.isEmpty else { throw ImageProviderError.missingAPIKey }
+        guard !apiKey.isEmpty else { throw ImageProviderError.missingAPIKey(providerName) }
 
         var urlRequest: URLRequest
         if let photo = request.photoJPEG {
@@ -39,7 +40,8 @@ struct OpenAIImageProvider: ImageProvider {
 
         guard (200..<300).contains(status) else {
             let message = (json?["error"] as? [String: Any])?["message"] as? String
-            throw ImageProviderError.http(status, message ?? String(decoding: data.prefix(300), as: UTF8.self))
+            throw ImageProviderError.http(status, message ?? (json?["error"] as? String)
+                                          ?? String(decoding: data.prefix(300), as: UTF8.self))
         }
         guard let first = (json?["data"] as? [[String: Any]])?.first else { throw ImageProviderError.badResponse }
 

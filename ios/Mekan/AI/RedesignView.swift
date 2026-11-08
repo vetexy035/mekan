@@ -62,6 +62,8 @@ struct RedesignView: View {
                         }
                     }
                     .disabled(working)
+                } footer: {
+                    Text("Sağlayıcı: \(AISettings.selected.displayName) · \(AISettings.model(AISettings.selected))")
                 }
             }
             .navigationTitle("AI tasarım")
