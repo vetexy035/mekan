@@ -26,12 +26,18 @@ final class RoomScanner: NSObject, ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var instruction: String?
     private(set) var result: Result?
+    /// Multi-room mode: every finished room, all in the same world coordinates.
+    @Published private(set) var rooms: [Result] = []
 
     let captureView: RoomCaptureView
+    /// Keeps the AR session running between rooms so they share one coordinate
+    /// system (required for StructureBuilder to merge them).
+    let multiRoom: Bool
     private var lastPhoto: UIImage?
 
-    override init() {
-        captureView = RoomCaptureView(frame: .zero)
+    init(multiRoom: Bool = false) {
+        self.multiRoom = multiRoom
+        captureView = multiRoom ? RoomCaptureView(frame: .zero, arSession: ARSession()) : RoomCaptureView(frame: .zero)
         super.init()
         captureView.delegate = self
         captureView.captureSession.delegate = self
@@ -47,11 +53,17 @@ final class RoomScanner: NSObject, ObservableObject {
     }
 
     /// Stops capture. RoomPlan then post-processes and calls `didPresent`.
+    /// In multi-room mode the AR session keeps tracking while the user walks on.
     func finish() {
         guard state == .scanning else { return }
         lastPhoto = Self.snapshot(captureView.captureSession.arSession.currentFrame)
-        captureView.captureSession.stop()
+        captureView.captureSession.stop(pauseARSession: !multiRoom)
         state = .processing
+    }
+
+    /// Multi-room: stop tracking for good once the last room is done.
+    func endSession() {
+        captureView.captureSession.arSession.pause()
     }
 
     func cancel() {
@@ -84,7 +96,9 @@ extension RoomScanner: RoomCaptureViewDelegate {
                 self.state = .failed(error.localizedDescription)
                 return
             }
-            self.result = Result(room: processedResult, photo: self.lastPhoto)
+            let r = Result(room: processedResult, photo: self.lastPhoto)
+            self.result = r
+            if self.multiRoom { self.rooms.append(r) }
             self.state = .finished
         }
     }

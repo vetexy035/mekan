@@ -38,6 +38,8 @@ struct FloorPlanView: View {
     /// Editor selection, drawn emphasized.
     var selectedObjectId: String?
     var selectedWallId: String?
+    /// Home plans: room name and area at the middle of each room.
+    var roomLabels: [HomePlan.RoomLabel] = []
 
     var body: some View {
         Canvas { ctx, size in
@@ -87,6 +89,17 @@ struct FloorPlanView: View {
             if let id = selectedWallId, let w = wallsById[id] {
                 var sel = Path(); sel.move(to: p(w.start.x, w.start.z)); sel.addLine(to: p(w.end.x, w.end.z))
                 ctx.stroke(sel, with: .color(.accentColor), style: StrokeStyle(lineWidth: 8, lineCap: .round))
+            }
+
+            for label in roomLabels {
+                let text = Text(label.text).font(.system(size: 12, weight: .bold)).foregroundStyle(.primary)
+                let at = p(label.position.x, label.position.z)
+                let resolved = ctx.resolve(text)
+                let size = resolved.measure(in: CGSize(width: 400, height: 40))
+                let box = CGRect(x: at.x - size.width / 2 - 6, y: at.y - size.height / 2 - 3,
+                                 width: size.width + 12, height: size.height + 6)
+                ctx.fill(Path(roundedRect: box, cornerRadius: 6), with: .color(Color(.systemBackground).opacity(0.85)))
+                ctx.draw(resolved, at: at)
             }
 
             for spot in highlights {

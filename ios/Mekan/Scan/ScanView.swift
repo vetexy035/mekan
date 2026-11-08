@@ -12,7 +12,7 @@ private struct RoomCaptureRepresentable: UIViewRepresentable {
 struct ScanView: View {
     @EnvironmentObject private var store: ScanStore
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var scanner = RoomScanner()
+    @StateObject private var scanner = RoomScanner(multiRoom: false)
     @State private var name = ""
     @State private var askName = false
     @State private var saveError: String?

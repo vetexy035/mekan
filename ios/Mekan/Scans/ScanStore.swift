@@ -11,14 +11,18 @@ import MekanCore
 @MainActor
 final class ScanStore: ObservableObject {
     @Published private(set) var scans: [RoomScan] = []
+    @Published private(set) var homes: [HomePlan] = []
 
     private let root: URL
+    private let homesRoot: URL
     private let fm = FileManager.default
 
     init() {
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
         root = docs.appendingPathComponent("scans", isDirectory: true)
+        homesRoot = docs.appendingPathComponent("homes", isDirectory: true)
         try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: homesRoot, withIntermediateDirectories: true)
         reload()
     }
 
@@ -29,6 +33,60 @@ final class ScanStore: ObservableObject {
             return try? RoomScan.decoder.decode(RoomScan.self, from: data)
         }
         .sorted { $0.capturedAt > $1.capturedAt }
+
+        let homeDirs = (try? fm.contentsOfDirectory(at: homesRoot, includingPropertiesForKeys: nil)) ?? []
+        homes = homeDirs.compactMap { dir in
+            guard let data = try? Data(contentsOf: dir.appendingPathComponent("home.json")) else { return nil }
+            return try? RoomScan.decoder.decode(HomePlan.self, from: data)
+        }
+        .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    // MARK: Homes (multi-room)
+
+    func homeFolder(_ id: UUID) -> URL { homesRoot.appendingPathComponent(id.uuidString, isDirectory: true) }
+    func homeModelURL(_ id: UUID) -> URL { homeFolder(id).appendingPathComponent("home.usdz") }
+    func home(_ id: UUID) -> HomePlan? { homes.first { $0.id == id } }
+    func rooms(of home: HomePlan) -> [RoomScan] { home.roomIDs.compactMap { scan($0) } }
+
+    /// Merges rooms scanned in one session with Apple's StructureBuilder and saves
+    /// each room as a normal scan plus a HomePlan tying them together. If merging
+    /// fails, the rooms are still saved in their shared session coordinates.
+    func saveHome(name: String, rooms captured: [RoomScanner.Result]) async throws -> UUID {
+        var aligned = captured.map(\.room)
+        var merged = false
+        let homeId = UUID()
+        try fm.createDirectory(at: homeFolder(homeId), withIntermediateDirectories: true)
+        do {
+            let structure = try await StructureBuilder(options: [.beautifyObjects])
+                .capturedStructure(from: aligned)
+            if structure.rooms.count == aligned.count { aligned = structure.rooms }
+            try? structure.export(to: homeModelURL(homeId))
+            merged = true
+        } catch {
+            merged = false // keep the raw rooms; they already share coordinates
+        }
+
+        var usedNames: [String: Int] = [:]
+        var ids: [UUID] = []
+        for (i, room) in aligned.enumerated() {
+            let base = RoomTypeNames.turkish(RoomScanConverter.roomType(of: room)) ?? "Oda \(i + 1)"
+            usedNames[base, default: 0] += 1
+            let roomName = usedNames[base]! > 1 ? "\(base) \(usedNames[base]!)" : base
+            let photo = i < captured.count ? captured[i].photo : nil
+            ids.append(try save(room: room, photo: photo, name: "\(name) – \(roomName)"))
+        }
+
+        let home = HomePlan(id: homeId, name: name, roomIDs: ids, mergedByStructureBuilder: merged)
+        try RoomScan.encoder.encode(home).write(to: homeFolder(homeId).appendingPathComponent("home.json"))
+        reload()
+        return homeId
+    }
+
+    func deleteHome(_ id: UUID, includingRooms: Bool) {
+        if includingRooms, let h = home(id) { h.roomIDs.forEach { try? fm.removeItem(at: folder($0)) } }
+        try? fm.removeItem(at: homeFolder(id))
+        reload()
     }
 
     func scan(_ id: UUID) -> RoomScan? { scans.first { $0.id == id } }
