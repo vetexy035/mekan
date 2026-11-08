@@ -92,6 +92,9 @@ struct ScanDetailView: View {
                     Button { export { try writeTemp(PlanSVG.make(scan: scan), ext: "svg") } } label: {
                         Label("SVG plan (çizim programları)", systemImage: "square.on.circle")
                     }
+                    Button { export { try writeTemp(PlanDXF.make(scan: scan), ext: "dxf") } } label: {
+                        Label("DXF plan (AutoCAD, mimar)", systemImage: "pencil.and.outline")
+                    }
                     Button { export { try writeTemp(String(decoding: RoomScan.encoder.encode(scan), as: UTF8.self), ext: "json") } } label: {
                         Label("JSON ölçü verisi", systemImage: "curlybraces")
                     }
