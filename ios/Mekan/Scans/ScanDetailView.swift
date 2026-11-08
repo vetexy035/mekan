@@ -11,6 +11,8 @@ struct ScanDetailView: View {
     @State private var showRedesign = false
     @State private var showPlan = false
     @State private var show3D = false
+    @State private var pdfURL: URL?
+    @State private var pdfError: String?
 
     private var m: RoomMeasurements { RoomMeasurements(scan: scan) }
 
@@ -60,6 +62,14 @@ struct ScanDetailView: View {
                 Button { showRedesign = true } label: {
                     Label("AI ile yeniden tasarla", systemImage: "wand.and.stars")
                 }
+                NavigationLink { MaterialsView(scan: scan) } label: {
+                    Label("Malzeme hesabı (boya, parke…)", systemImage: "paintbrush")
+                }
+                Button {
+                    do { pdfURL = try PlanPDF.make(scan: scan) } catch { pdfError = error.localizedDescription }
+                } label: {
+                    Label("PDF plan paylaş", systemImage: "doc.richtext")
+                }
                 ShareLink(item: store.modelURL(scan.id)) {
                     Label("USDZ paylaş", systemImage: "square.and.arrow.up")
                 }
@@ -89,6 +99,10 @@ struct ScanDetailView: View {
         .fullScreenCover(isPresented: $show3D) {
             Room3DView(scan: scan)
         }
+        .sheet(item: $pdfURL) { url in ShareSheet(items: [url]) }
+        .alert("PDF oluşturulamadı", isPresented: .constant(pdfError != nil)) {
+            Button("Tamam") { pdfError = nil }
+        } message: { Text(pdfError ?? "") }
     }
 
     private func meters(_ v: Double) -> String { String(format: "%.2f m", v) }
