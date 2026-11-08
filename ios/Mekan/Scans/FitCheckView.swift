@@ -10,7 +10,14 @@ struct FitCheckView: View {
     @State private var width: Double?
     @State private var depth: Double?
     @State private var height: Double?
+    @State private var category = "sofa"
+    @State private var showAR = false
     @FocusState private var focused: Bool
+
+    private static let categories: [(String, String)] = [
+        ("sofa", "Koltuk"), ("table", "Masa"), ("chair", "Sandalye"), ("bed", "Yatak"),
+        ("storage", "Dolap"), ("refrigerator", "Buzdolabı"),
+    ]
 
     private var item: FurnitureSize? {
         guard let w = width, let d = depth, let h = height, w > 0, d > 0, h > 0 else { return nil }
@@ -21,9 +28,20 @@ struct FitCheckView: View {
         let report = item.map { FitCheck.check($0, in: scan) }
         Form {
             Section {
+                Picker("Ne alıyorsun?", selection: $category) {
+                    ForEach(Self.categories, id: \.0) { Text($0.1).tag($0.0) }
+                }
                 field("Genişlik", $width)
                 field("Derinlik", $depth)
                 field("Yükseklik", $height)
+                if let item {
+                    Button { showAR = true } label: {
+                        Label("Odamda AR ile gör (gerçek boyut)", systemImage: "arkit")
+                    }
+                    .fullScreenCover(isPresented: $showAR) {
+                        ARPlacementView(preset: .custom(category: category, size: item))
+                    }
+                }
             } header: {
                 Text("Almak istediğin eşyanın dış ölçüleri")
             } footer: {

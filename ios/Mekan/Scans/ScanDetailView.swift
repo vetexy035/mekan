@@ -12,6 +12,7 @@ struct ScanDetailView: View {
     @State private var showPlan = false
     @State private var show3D = false
     @State private var showEditor = false
+    @State private var showAR = false
     @State private var shareURL: URL?
     @State private var exportError: String?
 
@@ -79,6 +80,9 @@ struct ScanDetailView: View {
                 Button { showRedesign = true } label: {
                     Label("AI ile yeniden tasarla", systemImage: "wand.and.stars")
                 }
+                Button { showAR = true } label: {
+                    Label("AR'da mobilya dene", systemImage: "arkit")
+                }
                 NavigationLink { FitCheckView(scan: scan) } label: {
                     Label("Sığar mı? (yeni eşya kontrolü)", systemImage: "ruler")
                 }
@@ -135,6 +139,7 @@ struct ScanDetailView: View {
         .fullScreenCover(isPresented: $show3D) {
             Room3DView(scan: scan, design: store.design(scan.id)) { store.setDesign($0, for: scan.id) }
         }
+        .fullScreenCover(isPresented: $showAR) { ARPlacementView() }
         .fullScreenCover(isPresented: $showEditor) {
             PlanEditorView(scan: scan).environmentObject(store)
         }
