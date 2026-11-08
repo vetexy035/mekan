@@ -10,6 +10,7 @@ struct ScanDetailView: View {
     @State private var modelURL: URL?
     @State private var showRedesign = false
     @State private var showPlan = false
+    @State private var show3D = false
 
     private var m: RoomMeasurements { RoomMeasurements(scan: scan) }
 
@@ -45,6 +46,9 @@ struct ScanDetailView: View {
             }
 
             Section {
+                Button { show3D = true } label: {
+                    Label("3D oda (mobilyalı)", systemImage: "sofa")
+                }
                 Button { modelURL = store.modelURL(scan.id) } label: {
                     Label("3D model (sade, kutu eşyalar)", systemImage: "cube")
                 }
@@ -81,6 +85,9 @@ struct ScanDetailView: View {
         }
         .fullScreenCover(isPresented: $showPlan) {
             FloorPlanFullScreen(scan: scan)
+        }
+        .fullScreenCover(isPresented: $show3D) {
+            Room3DView(scan: scan)
         }
     }
 

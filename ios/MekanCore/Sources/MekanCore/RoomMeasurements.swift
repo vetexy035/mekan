@@ -51,6 +51,9 @@ public struct RoomMeasurements: Equatable, Sendable {
         return ((xs.max()! - xs.min()!), (zs.max()! - zs.min()!))
     }
 
+    /// Floor outline (corner points in order), or nil when the walls don't close.
+    public static func floorPolygon(_ walls: [Wall]) -> [Point2]? { closedPolygon(walls) }
+
     /// Chains walls end-to-end (any order, either direction). Returns the corner
     /// polygon only if every wall is used and the chain closes on itself.
     static func closedPolygon(_ walls: [Wall]) -> [Point2]? {
